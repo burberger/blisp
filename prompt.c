@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
 
   mpca_lang(MPC_LANG_DEFAULT,
     "                                                    \
-      number   : /-?[0-9]+/ ;                            \
+      number   : /-?[0-9]*.?[0-9]+/ | /-?[0-9]+/ ;       \
       operator : '+' | '-' | '*' | '/' ;                 \
       expr     : <number> | '(' <operator> <expr>+ ')' ; \
       blisp    : /^/ <operator> <expr>+ /$/ ;            \
