@@ -9,32 +9,43 @@
 #include <editline/readline.h>
 
 #include "mpc.h"
+#include "lval.h"
+
 
 //Core set of operators
-long eval_operator(long x, char* op, long y) {
-  if (strcmp(op, "+") == 0) return x + y;
-  if (strcmp(op, "-") == 0) return x - y;
-  if (strcmp(op, "*") == 0) return x * y;
-  if (strcmp(op, "/") == 0) return x / y;
-  if (strcmp(op, "%") == 0) return x % y;
-  if (strcmp(op, "^") == 0) return pow(x, y);
+lval eval_operator(lval x, char* op, lval y) {
 
-  if (strcmp(op, "min") == 0) return x < y ? x : y;
-  if (strcmp(op, "max") == 0) return x > y ? x : y;
+  if (x.type == LVAL_ERR) return x;
+  if (y.type == LVAL_ERR) return y;
 
-  return 0;
+  if (strcmp(op, "+") == 0) return lval_num(x.num + y.num);
+  if (strcmp(op, "-") == 0) return lval_num(x.num - y.num);
+  if (strcmp(op, "*") == 0) return lval_num(x.num * y.num);
+  if (strcmp(op, "%") == 0) return lval_num(x.num % y.num);
+  if (strcmp(op, "^") == 0) return lval_num(pow(x.num, y.num));
+
+  if (strcmp(op, "/") == 0) {
+    return y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num);
+  }
+
+  if (strcmp(op, "min") == 0) return x.num < y.num ? x : y;
+  if (strcmp(op, "max") == 0) return x.num > y.num ? x : y;
+
+  return lval_err(LERR_BAD_OP);
 }
 
-long eval(mpc_ast_t* t) {
+lval eval(mpc_ast_t* t) {
   if (strstr(t->tag, "number")) {
-    return atoi(t->contents);
+    errno = 0;
+    long x = strtol(t->contents, NULL, 10);
+    return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
   }
 
   //Second child is always operator
   char* op = t->children[1]->contents;
 
   //store 3rd child in x
-  long x = eval(t->children[2]);
+  lval x = eval(t->children[2]);
 
   //Recursively evaluate operators in the tree
   int i = 3;
@@ -45,7 +56,8 @@ long eval(mpc_ast_t* t) {
 
   //Support for negating single argument to - operator
   if (strcmp(op, "-") == 0 && i == 3) {
-    return -x;
+    x.num = -x.num;
+    return x;
   }
 
   return x;
@@ -86,9 +98,9 @@ int main(int argc, char** argv) {
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, blisp, &r)) {
       //Evaluate expression tree and print result
-      mpc_ast_print(r.output);
-      long result = eval(r.output);
-      printf("%li\n", result);
+      /*mpc_ast_print(r.output);*/
+      lval result = eval(r.output);
+      lval_println(result);
       mpc_ast_delete(r.output);
     } else {
       //Failed, print parser error
