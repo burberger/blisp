@@ -18,6 +18,10 @@ long eval_operator(long x, char* op, long y) {
   if (strcmp(op, "/") == 0) return x / y;
   if (strcmp(op, "%") == 0) return x % y;
   if (strcmp(op, "^") == 0) return pow(x, y);
+
+  if (strcmp(op, "min") == 0) return x < y ? x : y;
+  if (strcmp(op, "max") == 0) return x > y ? x : y;
+
   return 0;
 }
 
@@ -50,18 +54,20 @@ long eval(mpc_ast_t* t) {
 int main(int argc, char** argv) {
   /* Create parser */
   mpc_parser_t* number   = mpc_new("number");
+  mpc_parser_t* function = mpc_new("function");
   mpc_parser_t* operator = mpc_new("operator");
   mpc_parser_t* expr     = mpc_new("expr");
   mpc_parser_t* blisp    = mpc_new("blisp");
 
   mpca_lang(MPC_LANG_DEFAULT,
-    "                                                    \
-      number   : /-?[0-9]*[.]?[0-9]+/ | /-?[0-9]+/ ;     \
-      operator : '+' | '-' | '*' | '/' | '%' | '^' ;     \
-      expr     : <number> | '(' <operator> <expr>+ ')' ; \
-      blisp    : /^/ <operator> <expr>+ /$/ ;            \
+    "                                                             \
+      number   : /-?[0-9]*[.]?[0-9]+/ | /-?[0-9]+/ ;              \
+      function : /[a-zA-Z0-9]+/ ;                                 \
+      operator : '+' | '-' | '*' | '/' | '%' | '^' | <function> ; \
+      expr     : <number> | '(' <operator> <expr>+ ')' ;          \
+      blisp    : /^/ <operator> <expr>+ /$/ ;                     \
     ",
-    number, operator, expr, blisp
+    number, function, operator, expr, blisp
   );
 
   // Print version info
@@ -80,6 +86,7 @@ int main(int argc, char** argv) {
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, blisp, &r)) {
       //Evaluate expression tree and print result
+      mpc_ast_print(r.output);
       long result = eval(r.output);
       printf("%li\n", result);
       mpc_ast_delete(r.output);
