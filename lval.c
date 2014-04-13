@@ -25,9 +25,10 @@ lval lval_err(lerr_t x) {
   return v;
 }
 
-/* lval arithmetic */
+/* lval arithmetic
+ * Ugly typematching logic
+ */
 
-// Adds two lvals of arbitrary type
 lval lval_add(lval x, lval y) {
   if (x.type == LVAL_DEC && y.type == LVAL_NUM) {
     return lval_dec(x.dec + y.num);
