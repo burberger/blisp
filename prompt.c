@@ -18,27 +18,38 @@ lval eval_operator(lval x, char* op, lval y) {
   if (x.type == LVAL_ERR) return x;
   if (y.type == LVAL_ERR) return y;
 
-  if (strcmp(op, "+") == 0) return lval_num(x.num + y.num);
-  if (strcmp(op, "-") == 0) return lval_num(x.num - y.num);
-  if (strcmp(op, "*") == 0) return lval_num(x.num * y.num);
-  if (strcmp(op, "%") == 0) return lval_num(x.num % y.num);
-  if (strcmp(op, "^") == 0) return lval_num(pow(x.num, y.num));
+  if (strcmp(op, "+") == 0) return lval_add(x, y);
+  if (strcmp(op, "-") == 0) return lval_sub(x, y);
+  if (strcmp(op, "*") == 0) return lval_mul(x, y);
+  if (strcmp(op, "^") == 0) return lval_pow(x, y);
 
   if (strcmp(op, "/") == 0) {
-    return y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num);
+    return y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_div(x, y);
+  }
+  if (strcmp(op, "%") == 0) {
+    if (x.type == LVAL_DEC || y.type == LVAL_DEC) return lval_err(LERR_BAD_OP);
+    return y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num % y.num);
   }
 
-  if (strcmp(op, "min") == 0) return x.num < y.num ? x : y;
-  if (strcmp(op, "max") == 0) return x.num > y.num ? x : y;
+  if (strcmp(op, "min") == 0) return lval_min(x, y);
+  if (strcmp(op, "max") == 0) return lval_max(x, y);
 
   return lval_err(LERR_BAD_OP);
 }
 
 lval eval(mpc_ast_t* t) {
+  //Convert to long
   if (strstr(t->tag, "number")) {
     errno = 0;
     long x = strtol(t->contents, NULL, 10);
     return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
+  }
+
+  //Convert to double
+  if (strstr(t->tag, "decimal")) {
+    errno = 0;
+    double x = strtod(t->contents, NULL);
+    return errno != ERANGE ? lval_dec(x) : lval_err(LERR_BAD_NUM);
   }
 
   //Second child is always operator
@@ -66,20 +77,22 @@ lval eval(mpc_ast_t* t) {
 int main(int argc, char** argv) {
   /* Create parser */
   mpc_parser_t* number   = mpc_new("number");
+  mpc_parser_t* decimal  = mpc_new("decimal");
   mpc_parser_t* function = mpc_new("function");
   mpc_parser_t* operator = mpc_new("operator");
   mpc_parser_t* expr     = mpc_new("expr");
   mpc_parser_t* blisp    = mpc_new("blisp");
 
   mpca_lang(MPC_LANG_DEFAULT,
-    "                                                             \
-      number   : /-?[0-9]*[.]?[0-9]+/ | /-?[0-9]+/ ;              \
-      function : /[a-zA-Z0-9]+/ ;                                 \
-      operator : '+' | '-' | '*' | '/' | '%' | '^' | <function> ; \
-      expr     : <number> | '(' <operator> <expr>+ ')' ;          \
-      blisp    : /^/ <operator> <expr>+ /$/ ;                     \
+    "                                                                \
+      number   : /-?[0-9]+/ ;                                        \
+      decimal  : /-?[0-9]*[.]?[0-9]+/  ;                             \
+      function : /[a-zA-Z0-9]+/ ;                                    \
+      operator : '+' | '-' | '*' | '/' | '%' | '^' | <function> ;    \
+      expr     : <decimal> | <number> | '(' <operator> <expr>+ ')' ; \
+      blisp    : /^/ <operator> <expr>+ /$/ ;                        \
     ",
-    number, function, operator, expr, blisp
+    number, decimal, function, operator, expr, blisp
   );
 
   // Print version info
