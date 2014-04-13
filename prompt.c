@@ -10,11 +10,14 @@
 
 #include "mpc.h"
 
+//Core set of operators
 long eval_operator(long x, char* op, long y) {
   if (strcmp(op, "+") == 0) return x + y;
   if (strcmp(op, "-") == 0) return x - y;
   if (strcmp(op, "*") == 0) return x * y;
   if (strcmp(op, "/") == 0) return x / y;
+  if (strcmp(op, "%") == 0) return x % y;
+  if (strcmp(op, "^") == 0) return pow(x, y);
   return 0;
 }
 
@@ -29,10 +32,16 @@ long eval(mpc_ast_t* t) {
   //store 3rd child in x
   long x = eval(t->children[2]);
 
+  //Recursively evaluate operators in the tree
   int i = 3;
   while (strstr(t->children[i]->tag, "expr")) {
     x = eval_operator(x, op, eval(t->children[i]));
     i++;
+  }
+
+  //Support for negating single argument to - operator
+  if (strcmp(op, "-") == 0 && i == 3) {
+    return -x;
   }
 
   return x;
@@ -47,8 +56,8 @@ int main(int argc, char** argv) {
 
   mpca_lang(MPC_LANG_DEFAULT,
     "                                                    \
-      number   : /-?[0-9]*[.]?[0-9]+/ | /-?[0-9]+/ ;       \
-      operator : '+' | '-' | '*' | '/' ;                 \
+      number   : /-?[0-9]*[.]?[0-9]+/ | /-?[0-9]+/ ;     \
+      operator : '+' | '-' | '*' | '/' | '%' | '^' ;     \
       expr     : <number> | '(' <operator> <expr>+ ')' ; \
       blisp    : /^/ <operator> <expr>+ /$/ ;            \
     ",
@@ -61,6 +70,10 @@ int main(int argc, char** argv) {
 
   while (1) {
     char* input = readline("Blisp> ");
+
+    //Skip input if blank
+    if (strcmp(input, "") == 0) continue;
+
     add_history(input);
 
     //Parse input
