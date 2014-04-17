@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "mpc.h"
 #include "lval.h"
 
 // Create numeric lval and return pointer
@@ -9,14 +10,6 @@ lval* lval_num(long x) {
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_NUM;
   v->num = x;
-  return v;
-}
-
-// Create numeric lval and return pointer
-lval* lval_dec(double x) {
-  lval* v = malloc(sizeof(lval));
-  v->type = LVAL_DEC;
-  v->dec = x;
   return v;
 }
 
@@ -51,7 +44,6 @@ void lval_del(lval* v) {
   switch (v->type) {
     // Do nothing special for numbers
     case LVAL_NUM: break;
-    case LVAL_DEC: break;
 
     // Free character buffers storing commands
     case LVAL_ERR: free(v->err); break;
@@ -64,107 +56,67 @@ void lval_del(lval* v) {
       free(v->cell);
     break;
   }
+  //Free the lval itself
+  free(v);
 }
 
-/* lval arithmetic
- * Ugly typematching logic
- */
-
-lval* lval_add(lval *x, lval *y) {
-  if (x->type == LVAL_DEC && y->type == LVAL_NUM) {
-    return lval_dec(x->dec + y->num);
-  } else if (x->type == LVAL_NUM && y->type == LVAL_DEC) {
-    return lval_dec(x->num + y->dec);
-  } else if (x->type == LVAL_DEC && y->type == LVAL_DEC) {
-    return lval_dec(x->dec + y->dec);
-  } else {
-    return lval_num(x->num + y->num);
-  }
+//Add a new s-expression to the chain
+lval* lval_add(lval* v, lval* x) {
+  v->count++;
+  v->cell = realloc(v->cell, sizeof(lval*) * v->count);
+  v->cell[v->count-1] = x;
+  return v;
 }
 
-lval* lval_sub(lval *x, lval *y) {
-  if (x->type == LVAL_DEC && y->type == LVAL_NUM) {
-    return lval_dec(x->dec - y->num);
-  } else if (x->type == LVAL_NUM && y->type == LVAL_DEC) {
-    return lval_dec(x->num - y->dec);
-  } else if (x->type == LVAL_DEC && y->type == LVAL_DEC) {
-    return lval_dec(x->dec - y->dec);
-  } else {
-    return lval_num(x->num - y->num);
-  }
+lval* lval_read_num(mpc_ast_t* t) {
+  errno = 0;
+  long x = strtol(t->contents, NULL, 10);
+  return errno != ERANGE ? lval_num(x) : lval_err("Invalid number");
 }
 
-lval* lval_mul(lval *x, lval *y) {
-  if (x->type == LVAL_DEC && y->type == LVAL_NUM) {
-    return lval_dec(x->dec * y->num);
-  } else if (x->type == LVAL_NUM && y->type == LVAL_DEC) {
-    return lval_dec(x->num * y->dec);
-  } else if (x->type == LVAL_DEC && y->type == LVAL_DEC) {
-    return lval_dec(x->dec * y->dec);
-  } else {
-    return lval_num(x->num * y->num);
+lval* lval_read(mpc_ast_t* t) {
+  if (strstr(t->tag, "number")) { return lval_read_num(t); }
+  if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
+
+  // if root or sexpr make empty list
+  lval* x = NULL;
+  if (strcmp(t->tag, ">") == 0) { x = lval_sexpr(); }
+  if (strstr(t->tag, "sexpr"))  { x = lval_sexpr(); }
+
+  //Fill list with any valid expressions inside
+  for (int i = 0; i < t->children_num; i++) {
+    if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
+    if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
+    if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
+    if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
+    if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
+    x = lval_add(x, lval_read(t->children[i]));
   }
+
+  return x;
 }
 
-lval* lval_div(lval *x, lval *y) {
-  if (x->type == LVAL_DEC && y->type == LVAL_NUM) {
-    return lval_dec(x->dec / y->num);
-  } else if (x->type == LVAL_NUM && y->type == LVAL_DEC) {
-    return lval_dec(x->num / y->dec);
-  } else if (x->type == LVAL_DEC && y->type == LVAL_DEC) {
-    return lval_dec(x->dec / y->dec);
-  } else {
-    return lval_num(x->num / y->num);
-  }
-}
+void lval_expr_print(lval* v, char open, char close) {
+  putchar(open);
+  for (int i = 0; i < v->count; i++) {
+    //print contents
+    lval_print(v->cell[i]);
 
-lval* lval_pow(lval *x, lval *y) {
-  if (x->type == LVAL_DEC && y->type == LVAL_NUM) {
-    return lval_dec(pow(x->dec, y->num));
-  } else if (x->type == LVAL_NUM && y->type == LVAL_DEC) {
-    return lval_dec(pow(x->num, y->dec));
-  } else if (x->type == LVAL_DEC && y->type == LVAL_DEC) {
-    return lval_dec(pow(x->dec, y->dec));
-  } else {
-    return lval_num(pow(x->num, y->num));
+    //Padding whitespace for all but last element
+    if (i != (v->count-1)) {
+      putchar(' ');
+    }
   }
-}
-
-lval* lval_min(lval *x, lval *y) {
-  if (x->type == LVAL_DEC && y->type == LVAL_NUM) {
-    return x->dec < y->num ? *x : *y;
-  } else if (x->type == LVAL_NUM && y->type == LVAL_DEC) {
-    return x->num < y->dec ? *x : *y;
-  } else if (x->type == LVAL_DEC && y->type == LVAL_DEC) {
-    return x->dec < y->dec ? *x : *y;
-  } else {
-    return x->num < y->num ? *x : *y;
-  }
-}
-
-lval* lval_max(lval *x, lval *y) {
-  if (x->type == LVAL_DEC && y->type == LVAL_NUM) {
-    return x->dec > y->num ? *x : *y;
-  } else if (x->type == LVAL_NUM && y->type == LVAL_DEC) {
-    return x->num > y->dec ? *x : *y;
-  } else if (x->type == LVAL_DEC && y->type == LVAL_DEC) {
-    return x->dec > y->dec ? *x : *y;
-  } else {
-    return x->num > y->num ? *x : *y;
-  }
+  putchar(close);
 }
 
 // Print contents of lval
 void lval_print(lval* v) {
-  switch (v.type) {
-    case LVAL_NUM: printf("%li", v.num); break;
-    case LVAL_DEC: printf("%f", v.dec); break;
-    case LVAL_ERR:
-      if (v.err == LERR_DIV_ZERO) printf("Error: Divide by zero");
-      if (v.err == LERR_BAD_OP) printf("Error: Invalid operator");
-      if (v.err == LERR_BAD_NUM) printf("Error: Invalid number");
-
-    break;
+  switch(v->type) {
+    case LVAL_NUM: printf("%li", v->num); break;
+    case LVAL_ERR: printf("Error: %s", v->err); break;
+    case LVAL_SYM: printf("%s", v->sym); break;
+    case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
   }
 }
 
