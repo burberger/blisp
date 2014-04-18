@@ -4,7 +4,7 @@
 #define LVAL_H
 
 /* Enumeration of value types and error types */
-typedef enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR} ltype_t;
+typedef enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR} ltype_t;
 typedef enum {LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM} lerr_t;
 
 /* Lisp value type */
@@ -26,6 +26,7 @@ lval* lval_num(long x);
 lval* lval_err(char* m);
 lval* lval_sym(char* s);
 lval* lval_sexpr(void);
+lval* lval_qexpr(void);
 
 void lval_del(lval* v);
 
