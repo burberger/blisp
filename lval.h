@@ -33,6 +33,14 @@ lval* lval_add(lval* v, lval* x);
 lval* lval_read_num(mpc_ast_t* t);
 lval* lval_read(mpc_ast_t* t);
 
+lval* lval_pop(lval* v, int i);
+lval* lval_take(lval* v, int i);
+
+lval* lval_eval_sexpr(lval* v);
+lval* lval_eval(lval* v);
+
+lval* builtin_op(lval* a, char* op);
+
 void lval_expr_print(lval* v, char first, char last);
 void lval_print(lval* v);
 void lval_println(lval* v);
