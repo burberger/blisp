@@ -14,7 +14,6 @@
 int main(int argc, char** argv) {
   // Create parser
   mpc_parser_t* number = mpc_new("number");
-  mpc_parser_t* func   = mpc_new("func");
   mpc_parser_t* symbol = mpc_new("symbol");
   mpc_parser_t* sexpr  = mpc_new("sexpr");
   mpc_parser_t* qexpr  = mpc_new("qexpr");
@@ -22,16 +21,15 @@ int main(int argc, char** argv) {
   mpc_parser_t* blisp  = mpc_new("blisp");
 
   mpca_lang(MPC_LANG_DEFAULT,
-    "                                                         \
-      number   : /-?[0-9]+/ ;                                 \
-      func     : /[a-zA-Z]+/ ;                                \
-      symbol   : <func> | '+' | '-' | '*' | '/' | '%' | '^' ; \
-      sexpr    : '(' <expr>* ')' ;                            \
-      qexpr    : '{' <expr>* '}' ;                            \
-      expr     : <number> | <symbol> | <sexpr> | <qexpr> ;    \
-      blisp    : /^/ <expr>* /$/ ;                            \
+    "                                                       \
+      number   : /-?[0-9]+/ ;                               \
+      symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&%^]+/ ;       \
+      sexpr    : '(' <expr>* ')' ;                          \
+      qexpr    : '{' <expr>* '}' ;                          \
+      expr     : <number> | <symbol> | <sexpr> | <qexpr> ;  \
+      blisp    : /^/ <expr>* /$/ ;                          \
     ",
-    number, func, symbol, sexpr, qexpr, expr, blisp
+    number, symbol, sexpr, qexpr, expr, blisp
   );
 
   // Print version info
@@ -64,6 +62,6 @@ int main(int argc, char** argv) {
   }
 
   //Cleanup parser before exiting
-  mpc_cleanup(7, number, func, symbol, sexpr, qexpr, expr, blisp);
+  mpc_cleanup(7, number, symbol, sexpr, qexpr, expr, blisp);
   return 0;
 }

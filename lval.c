@@ -6,6 +6,29 @@
 #include "lval.h"
 #include "builtin.h"
 
+//Creates a new environment
+lenv* lenv_new(void) {
+  lenv* e = malloc(sizeof(lenv));
+  e->count = 0;
+  e->syms = NULL;
+  e->vals = NULL;
+  return e;
+}
+
+//Deletes the provided environment
+void lenv_del(lenv* e) {
+  for (int i = 0; i < e->count; i++) {
+    free(e->syms[i]);
+    lval_del(e->vals[i]);
+  }
+  free(e->syms);
+  free(e->vals);
+  free(e);
+}
+
+lval* lval_get(lenv* e, lval* k) {
+  //Linear search for variable in environment
+}
 
 // Create numeric lval and return pointer
 lval* lval_num(long x) {
@@ -33,6 +56,13 @@ lval* lval_sym(char* s) {
   return v;
 }
 
+lval* lval_fun(lbuiltin func) {
+  lval* v = malloc(sizeof(lval));
+  v->type = LVAL_FUN;
+  v->fun = func;
+  return v;
+}
+
 lval* lval_sexpr(void) {
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_SEXPR;
@@ -49,11 +79,37 @@ lval* lval_qexpr(void) {
   return v;
 }
 
+lval* lval_copy(lval* v) {
+  lval* x = malloc(sizeof(lval));
+  x->type = v->type;
+
+  switch (v->type) {
+    //Copy numbers and functions directly
+    case LVAL_NUM: x->num = v->num; break;
+    case LVAL_FUN: x->fun = v->fun; break;
+
+    case LVAL_ERR: x->err = malloc(strlen(v->err)+1); strcpy(x->err, v->err); break;
+    case LVAL_SYM: x->sym = malloc(strlen(v->sym)+1); strcpy(x->sym, v->sym); break;
+
+    case LVAL_SEXPR:
+    case LVAL_QEXPR:
+      x->count = v->count;
+      x->cell = malloc(sizeof(lval*) * x->count);
+      for (int i = 0; i < x->count; i++) {
+        x->cell[i] = lval_copy(v->cell[i]);
+      }
+    break;
+  }
+
+  return x;
+}
+
 // Properly free all memory allocated for an lval
 void lval_del(lval* v) {
   switch (v->type) {
-    // Do nothing special for numbers
+    // Do nothing special for numbers or functions
     case LVAL_NUM: break;
+    case LVAL_FUN: break;
 
     // Free character buffers storing commands
     case LVAL_ERR: free(v->err); break;
@@ -203,6 +259,7 @@ void lval_print(lval* v) {
     case LVAL_SYM: printf("%s", v->sym); break;
     case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
     case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
+    case LVAL_FUN: printf("<function>"); break;
   }
 }
 

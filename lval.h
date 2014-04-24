@@ -3,12 +3,19 @@
 #ifndef LVAL_H
 #define LVAL_H
 
-/* Enumeration of value types and error types */
-typedef enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR} ltype_t;
-typedef enum {LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM} lerr_t;
+// Forward declarations
+struct lval;
+struct lenv;
+typedef struct lval lval;
+typedef struct lenv lenv;
 
-/* Lisp value type */
-typedef struct lval {
+// Enumeration of value types and error types
+typedef enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR} ltype_t;
+
+typedef lval*(*lbuiltin)(lenv*, lval*);
+
+// Lisp value type
+struct lval {
   ltype_t type;
 
   //numeric values
@@ -16,18 +23,32 @@ typedef struct lval {
     long num;
     char* err;
     char* sym;
+    lbuiltin fun;
   };
 
   int count;
   struct lval** cell;
-} lval;
+};
+
+struct lenv {
+  int count;
+  char** syms;
+  lval** vals;
+};
+
+//Environment functions
+lenv* lenv_new(void);
+void lenv_del(lenv* e);
 
 //Constructors
 lval* lval_num(long x);
 lval* lval_err(char* m);
 lval* lval_sym(char* s);
+lval* lval_fun(lbuiltin func);
 lval* lval_sexpr(void);
 lval* lval_qexpr(void);
+
+lval* lval_copy(lval* v);
 
 //Destructor
 void lval_del(lval* v);
