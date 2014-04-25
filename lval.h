@@ -38,7 +38,6 @@ struct lvar {
 };
 
 struct lenv {
-  int count;
   struct lvar* vars;
 };
 

@@ -90,6 +90,24 @@ lval* builtin_init(lenv* e, lval* a) {
   return x;
 }
 
+lval* builtin_def(lenv* e, lval* a) {
+  LASSERT(a, (a->cell[0]->type == LVAL_QEXPR), "Function 'def' passed incorrect type.");
+
+  lval* syms = a->cell[0];
+  for (int i = 0; i < syms->count; i++) {
+    LASSERT(a, (syms->cell[i]->type == LVAL_SYM), "Function 'def' cannot define non-symbol.");
+  }
+
+  LASSERT(a, (syms->count == a->count-1), "Function 'def' cannot define incorrect number of values.");
+
+  for (int i = 0; i < syms->count; i++) {
+    lenv_put(e, syms->cell[i], a->cell[i+1]);
+  }
+
+  lval_del(a);
+  return lval_sexpr();
+}
+
 lval* builtin_add(lenv* e, lval* a) { return builtin_op(e, a, "+"); }
 lval* builtin_sub(lenv* e, lval* a) { return builtin_op(e, a, "-"); }
 lval* builtin_mul(lenv* e, lval* a) { return builtin_op(e, a, "*"); }
