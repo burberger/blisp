@@ -36,6 +36,10 @@ int main(int argc, char** argv) {
   puts("BLisp v0.0.1");
   puts("Press Ctrl+C to Exit");
 
+  // Build environment before running
+  lenv* env = lenv_new();
+  lenv_add_builtins(env);
+
   while (1) {
     char* input = readline("Blisp> ");
 
@@ -48,7 +52,7 @@ int main(int argc, char** argv) {
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, blisp, &r)) {
       /*mpc_ast_print(r.output);*/
-      lval* x = lval_eval(lval_read(r.output));
+      lval* x = lval_eval(env, lval_read(r.output));
       lval_println(x);
       lval_del(x);
       mpc_ast_delete(r.output);
@@ -63,5 +67,6 @@ int main(int argc, char** argv) {
 
   //Cleanup parser before exiting
   mpc_cleanup(7, number, symbol, sexpr, qexpr, expr, blisp);
+  lenv_del(env);
   return 0;
 }

@@ -4,7 +4,7 @@
 #define LASSERT(args, cond, err) if (!(cond)) { lval_del(args); return lval_err(err); }
 
 //Return the first element in a list
-lval* builtin_head(lval* a) {
+lval* builtin_head(lenv* e, lval* a) {
   LASSERT(a, (a->count == 1), "Function 'head' passed too many arguments.");
   LASSERT(a, (a->cell[0]->type == LVAL_QEXPR), "Function 'head' passed incorrect type.");
   LASSERT(a, (a->cell[0]->count != 0), "Function 'head' passed {}.");
@@ -17,7 +17,7 @@ lval* builtin_head(lval* a) {
 }
 
 //Return all but the first element in a list
-lval* builtin_tail(lval* a) {
+lval* builtin_tail(lenv* e, lval* a) {
   LASSERT(a, (a->count == 1), "Function 'tail' passed too many arguments.");
   LASSERT(a, (a->cell[0]->type == LVAL_QEXPR), "Function 'tail' passed incorrect type.");
   LASSERT(a, (a->cell[0]->count != 0), "Function 'tail' passed {}.");
@@ -28,23 +28,23 @@ lval* builtin_tail(lval* a) {
 }
 
 //Change expression to a list
-lval* builtin_list(lval* a) {
+lval* builtin_list(lenv* e, lval* a) {
   a->type = LVAL_QEXPR;
   return a;
 }
 
 //Evaluate a list as an expression
-lval* builtin_eval(lval* a) {
+lval* builtin_eval(lenv* e, lval* a) {
   LASSERT(a, (a->count == 1), "Function 'eval' passed too many arguments.");
   LASSERT(a, (a->cell[0]->type == LVAL_QEXPR), "Function 'eval' passed incorrect type.");
 
   lval* x = lval_take(a, 0);
   x->type = LVAL_SEXPR;
-  return lval_eval(x);
+  return lval_eval(e, x);
 }
 
 //Join multiple lists into a single list
-lval* builtin_join(lval* a) {
+lval* builtin_join(lenv* e, lval* a) {
   for (int i = 0; i < a->count; i++) {
     LASSERT(a, (a->cell[i]->type == LVAL_QEXPR), "Function 'join' passed incorrect type.");
   }
@@ -60,7 +60,7 @@ lval* builtin_join(lval* a) {
 }
 
 //Appends element to beginning of list
-lval* builtin_cons(lval* a) {
+lval* builtin_cons(lenv* e, lval* a) {
   LASSERT(a, (a->count == 2), "Function 'cons' passed incorrect number of arguments.");
   LASSERT(a, (a->cell[1]->type == LVAL_QEXPR), "Fuction 'cons' passed incorrect type.");
 
@@ -71,7 +71,7 @@ lval* builtin_cons(lval* a) {
   return x;
 }
 
-lval* builtin_len(lval* a) {
+lval* builtin_len(lenv* e, lval* a) {
   LASSERT(a, (a->count == 1), "Function 'len' passed too many arguments.");
   LASSERT(a, (a->cell[0]->type == LVAL_QEXPR), "Function 'len' passed incorrect type.");
 
@@ -80,7 +80,7 @@ lval* builtin_len(lval* a) {
   return lval_num(x);
 }
 
-lval* builtin_init(lval* a) {
+lval* builtin_init(lenv* e, lval* a) {
   LASSERT(a, (a->count == 1), "Function 'init' passed too many arguments.");
   LASSERT(a, (a->cell[0]->type == LVAL_QEXPR), "Function 'init' passed incorrect type.");
   LASSERT(a, (a->cell[0]->count != 0), "Function 'init' passed {}.");
@@ -90,26 +90,15 @@ lval* builtin_init(lval* a) {
   return x;
 }
 
-lval* builtin(lval* a, char* func) {
-  if (strcmp("list", func) == 0) { return builtin_list(a); }
-  if (strcmp("head", func) == 0) { return builtin_head(a); }
-  if (strcmp("tail", func) == 0) { return builtin_tail(a); }
-  if (strcmp("join", func) == 0) { return builtin_join(a); }
-  if (strcmp("eval", func) == 0) { return builtin_eval(a); }
-  if (strcmp("cons", func) == 0) { return builtin_cons(a); }
-  if (strcmp("len",  func) == 0) { return builtin_len(a);  }
-  if (strcmp("init", func) == 0) { return builtin_init(a); }
-  if (strstr("+-*^/%", func)) { return builtin_op(a, func); }
-
-  lval_del(a);
-  char err[sizeof(func) + 20];
-  strcpy(err, "Unknown function: ");
-  strcat(err, func);
-  return lval_err(err);
-}
+lval* builtin_add(lenv* e, lval* a) { return builtin_op(e, a, "+"); }
+lval* builtin_sub(lenv* e, lval* a) { return builtin_op(e, a, "-"); }
+lval* builtin_mul(lenv* e, lval* a) { return builtin_op(e, a, "*"); }
+lval* builtin_pow(lenv* e, lval* a) { return builtin_op(e, a, "^"); }
+lval* builtin_div(lenv* e, lval* a) { return builtin_op(e, a, "/"); }
+lval* builtin_mod(lenv* e, lval* a) { return builtin_op(e, a, "%"); }
 
 //Compute builtin operators
-lval* builtin_op(lval* a, char* op) {
+lval* builtin_op(lenv* e, lval* a, char* op) {
   //Ensure all args are numbers
   for (int i = 0; i < a->count; i++) {
     if (a->cell[i]->type != LVAL_NUM) {

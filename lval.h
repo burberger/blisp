@@ -1,4 +1,5 @@
 #include "mpc.h"
+#include "uthash.h"
 
 #ifndef LVAL_H
 #define LVAL_H
@@ -30,15 +31,25 @@ struct lval {
   struct lval** cell;
 };
 
+struct lvar {
+  char* sym;
+  lval* val;
+  UT_hash_handle hh;
+};
+
 struct lenv {
   int count;
-  char** syms;
-  lval** vals;
+  struct lvar* vars;
 };
 
 //Environment functions
 lenv* lenv_new(void);
 void lenv_del(lenv* e);
+lval* lenv_get(lenv* e, lval* k);
+void lenv_put(lenv* e, lval* k, lval* v);
+
+void lenv_add_builtin(lenv* e, char* name, lbuiltin func);
+void lenv_add_builtins(lenv* e);
 
 //Constructors
 lval* lval_num(long x);
@@ -63,8 +74,8 @@ lval* lval_pop(lval* v, int i);
 lval* lval_take(lval* v, int i);
 lval* lval_join(lval* x, lval* y);
 
-lval* lval_eval_sexpr(lval* v);
-lval* lval_eval(lval* v);
+lval* lval_eval_sexpr(lenv* e, lval* v);
+lval* lval_eval(lenv* e, lval* v);
 
 //Pretty printing objects
 void lval_expr_print(lval* v, char first, char last);

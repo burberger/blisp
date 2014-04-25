@@ -5,29 +5,77 @@
 #include "mpc.h"
 #include "lval.h"
 #include "builtin.h"
+#include "uthash.h"
 
 //Creates a new environment
 lenv* lenv_new(void) {
   lenv* e = malloc(sizeof(lenv));
   e->count = 0;
-  e->syms = NULL;
-  e->vals = NULL;
+  e->vars = NULL;
   return e;
 }
 
 //Deletes the provided environment
 void lenv_del(lenv* e) {
-  for (int i = 0; i < e->count; i++) {
-    free(e->syms[i]);
-    lval_del(e->vals[i]);
+  struct lvar *current_var, *tmp;
+  
+  //Iterate over hash table and clean up each node
+  HASH_ITER(hh, e->vars, current_var, tmp) {
+    HASH_DEL(e->vars, current_var);
+    lval_del(current_var->val);
+    free(current_var->sym);
+    free(current_var);
   }
-  free(e->syms);
-  free(e->vals);
   free(e);
 }
 
-lval* lval_get(lenv* e, lval* k) {
-  //Linear search for variable in environment
+//Search environment for value, if not found return error
+lval* lenv_get(lenv* e, lval* k) {
+  struct lvar *result;
+  HASH_FIND_STR(e->vars, k->sym, result);
+  if (result != NULL) {
+    return lval_copy(result->val);
+  }
+  return lval_err("Unbound symbol.");
+}
+
+void lenv_put(lenv* e, lval* k, lval* v) {
+  struct lvar *variable;
+
+  //Search table to see if variable exists
+  HASH_FIND_STR(e->vars, k->sym, variable);
+  //Replace present value if exists
+  if (variable != NULL) {
+    lval_del(variable->val);
+    variable->val = lval_copy(v);
+    return;
+  }
+
+  //If no existing entry, place new entry in table
+  variable = malloc(sizeof(struct lvar));
+  variable->sym = malloc(sizeof(k->sym+1));
+  strcpy(variable->sym, k->sym);
+  variable->val = lval_copy(v);
+  HASH_ADD_STR(e->vars, sym, variable);
+}
+
+void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
+  lval* k = lval_sym(name);
+  lval* v = lval_fun(func);
+  lenv_put(e, k, v);
+  lval_del(k); lval_del(v);
+}
+
+void lenv_add_builtins(lenv* e) {
+  //List functions
+  lenv_add_builtin(e, "list", builtin_list);
+  lenv_add_builtin(e, "head", builtin_head); lenv_add_builtin(e, "tail", builtin_tail);
+  lenv_add_builtin(e, "eval", builtin_eval); lenv_add_builtin(e, "join", builtin_join);
+
+  //Math functions
+  lenv_add_builtin(e, "+", builtin_add); lenv_add_builtin(e, "-", builtin_sub);
+  lenv_add_builtin(e, "*", builtin_mul); lenv_add_builtin(e, "/", builtin_div);
+  lenv_add_builtin(e, "^", builtin_pow); lenv_add_builtin(e, "%", builtin_mod);
 }
 
 // Create numeric lval and return pointer
@@ -197,11 +245,11 @@ lval* lval_join(lval* x, lval* y) {
 }
 
 //Evaluate an s-expression
-lval* lval_eval_sexpr(lval* v) {
+lval* lval_eval_sexpr(lenv* e, lval* v) {
 
   //Eval children
   for (int i = 0; i < v->count; i++) {
-    v->cell[i] = lval_eval(v->cell[i]);
+    v->cell[i] = lval_eval(e, v->cell[i]);
   }
 
   //Error checking
@@ -215,27 +263,29 @@ lval* lval_eval_sexpr(lval* v) {
   //Single expression
   if (v->count == 1) { return lval_take(v, 0); }
 
-  //Ensure first element is a symbol
+  //Ensure element is unction after evaluation
   lval* f = lval_pop(v, 0);
-  if (f->type != LVAL_SYM) {
+  if (f->type != LVAL_FUN) {
     lval_del(f);
     lval_del(v);
-    return lval_err("S-expression does not start with symbol.");
+    return lval_err("First element is not a function.");
   }
 
   //Call builtin with operator
-  lval* result = builtin(v, f->sym);
+  lval* result = f->fun(e, v);
   lval_del(f);
   return result;
 }
 
-lval* lval_eval(lval* v) {
-  //Evaluate s-expressions
-  if (v->type == LVAL_SEXPR) { return lval_eval_sexpr(v); }
+lval* lval_eval(lenv* e, lval* v) {
+  if (v->type == LVAL_SYM) {
+    lval* x = lenv_get(e, v);
+    lval_del(v);
+    return x;
+  }
+  if (v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }
   return v;
 }
-
-
 
 void lval_expr_print(lval* v, char open, char close) {
   putchar(open);
