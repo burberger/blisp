@@ -3,6 +3,9 @@
 #ifndef BUILTIN_H
 #define BUILTIN_H
 
+//Utility functions
+char* ltype_name(ltype_t type);
+
 //List functions
 lval* builtin_head(lenv* e, lval* a);
 lval* builtin_tail(lenv* e, lval* a);

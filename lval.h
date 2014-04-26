@@ -52,7 +52,7 @@ void lenv_add_builtins(lenv* e);
 
 //Constructors
 lval* lval_num(long x);
-lval* lval_err(char* m);
+lval* lval_err(char* fmt, ...);
 lval* lval_sym(char* s);
 lval* lval_fun(lbuiltin func);
 lval* lval_sexpr(void);

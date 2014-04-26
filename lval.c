@@ -35,7 +35,7 @@ lval* lenv_get(lenv* e, lval* k) {
   if (result != NULL) {
     return lval_copy(result->val);
   }
-  return lval_err("Unbound symbol.");
+  return lval_err("Unbound symbol: %s", k->sym);
 }
 
 void lenv_put(lenv* e, lval* k, lval* v) {
@@ -88,11 +88,21 @@ lval* lval_num(long x) {
 }
 
 // Create error lval and return pointer
-lval* lval_err(char* m) {
+lval* lval_err(char* fmt, ...) {
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_ERR;
-  v->err = malloc(strlen(m) + 1);
-  strcpy(v->err, m);
+
+  va_list va;
+  va_start(va, fmt);
+
+  //Allocate space and then write formatted string to buffer
+  v->err = malloc(512);
+  vsnprintf(v->err, 511, fmt, va);
+
+  //Reallocate buffer to used space and clean up
+  v->err = realloc(v->err, strlen(v->err)+1);
+  va_end(va);
+
   return v;
 }
 
