@@ -6,7 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef __APPLE__
 #include <editline/readline.h>
+#else
+#include <readline/readline.h>
+#include <readline/history.h>
+#endif
 
 #include "mpc.h"
 #include "lval.h"

@@ -10,6 +10,7 @@
 //Creates a new environment
 lenv* lenv_new(void) {
   lenv* e = malloc(sizeof(lenv));
+  e->par = NULL;
   e->vars = NULL;
   return e;
 }
@@ -28,14 +29,18 @@ void lenv_del(lenv* e) {
   free(e);
 }
 
-//Search environment for value, if not found return error
+//Search environment for value
 lval* lenv_get(lenv* e, lval* k) {
   struct lvar *result;
   HASH_FIND_STR(e->vars, k->sym, result);
   if (result != NULL) {
     return lval_copy(result->val);
   }
-  return lval_err("Unbound symbol: %s", k->sym);
+  if (e->par) {
+    return lenv_get(e->par, k);
+  } else {
+    return lval_err("Unbound symbol: %s", k->sym);
+  }
 }
 
 void lenv_put(lenv* e, lval* k, lval* v) {
@@ -52,10 +57,37 @@ void lenv_put(lenv* e, lval* k, lval* v) {
 
   //If no existing entry, place new entry in table
   variable = malloc(sizeof(struct lvar));
-  variable->sym = malloc(sizeof(k->sym+1));
+  variable->sym = malloc(sizeof(k->sym)+1);
   strcpy(variable->sym, k->sym);
   variable->val = lval_copy(v);
   HASH_ADD_STR(e->vars, sym, variable);
+}
+
+//Iterates until env has no parent and then defines value globally
+void lenv_def(lenv* e, lval* k, lval* v) {
+  while(e->par) { e = e->par; }
+  lenv_put(e, k, v);
+}
+
+lenv* lenv_copy(lenv* e) {
+  lenv* n = malloc(sizeof(lenv));
+  n->vars = NULL;
+  n->par = e->par;
+
+  // Iterate over hashtable and copy each value to new env
+  struct lvar *cur_var;
+  struct lvar *new_var;
+  for (cur_var = e->vars; cur_var != NULL; cur_var = cur_var->hh.next) {
+    // Allocate space for new lvar
+    new_var = malloc(sizeof(struct lvar));
+    new_var->sym = malloc(sizeof(cur_var->sym)+1);
+    // Copy values over and add to new table
+    strcpy(new_var->sym, cur_var->sym);
+    new_var->val = lval_copy(cur_var->val);
+    HASH_ADD_STR(n->vars, sym, new_var);
+  }
+
+  return n;
 }
 
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
@@ -67,11 +99,14 @@ void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
 
 void lenv_add_builtins(lenv* e) {
   //List functions
-  lenv_add_builtin(e, "list", builtin_list); lenv_add_builtin(e, "def",  builtin_def);
+  lenv_add_builtin(e, "list", builtin_list); lenv_add_builtin(e, "len",  builtin_len);
   lenv_add_builtin(e, "head", builtin_head); lenv_add_builtin(e, "tail", builtin_tail);
   lenv_add_builtin(e, "eval", builtin_eval); lenv_add_builtin(e, "join", builtin_join);
   lenv_add_builtin(e, "cons", builtin_cons); lenv_add_builtin(e, "init", builtin_init);
-  lenv_add_builtin(e, "len",  builtin_len);
+
+  //Variable functions
+  lenv_add_builtin(e, "=",    builtin_put);  lenv_add_builtin(e, "def",  builtin_def);
+  lenv_add_builtin(e, "\\",   builtin_lambda);
 
   //Math functions
   lenv_add_builtin(e, "+", builtin_add); lenv_add_builtin(e, "-", builtin_sub);
@@ -118,7 +153,7 @@ lval* lval_sym(char* s) {
 lval* lval_fun(lbuiltin func) {
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_FUN;
-  v->fun = func;
+  v->builtin = func;
   return v;
 }
 
@@ -138,6 +173,21 @@ lval* lval_qexpr(void) {
   return v;
 }
 
+//Construct a lambda lval
+lval* lval_lambda(lval* formals, lval* body) {
+  lval* v = malloc(sizeof(lval));
+  v->type = LVAL_FUN;
+
+  //Set builtin to null to indicate lambda
+  v->builtin = NULL;
+
+  //Build enviornment and set vals
+  v->env = lenv_new();
+  v->formals = formals;
+  v->body = body;
+  return v;
+}
+
 lval* lval_copy(lval* v) {
   lval* x = malloc(sizeof(lval));
   x->type = v->type;
@@ -145,7 +195,16 @@ lval* lval_copy(lval* v) {
   switch (v->type) {
     //Copy numbers and functions directly
     case LVAL_NUM: x->num = v->num; break;
-    case LVAL_FUN: x->fun = v->fun; break;
+    case LVAL_FUN: 
+      if (v->builtin) {
+        x->builtin = v->builtin;
+      } else {
+        x->builtin = NULL;
+        x->env = lenv_copy(v->env);
+        x->formals = lval_copy(v->formals);
+        x->body = lval_copy(v->body);
+      }
+    break;
 
     case LVAL_ERR: x->err = malloc(strlen(v->err)+1); strcpy(x->err, v->err); break;
     case LVAL_SYM: x->sym = malloc(strlen(v->sym)+1); strcpy(x->sym, v->sym); break;
@@ -168,7 +227,13 @@ void lval_del(lval* v) {
   switch (v->type) {
     // Do nothing special for numbers or functions
     case LVAL_NUM: break;
-    case LVAL_FUN: break;
+    case LVAL_FUN: 
+      if (!v->builtin) {
+        lenv_del(v->env);
+        lval_del(v->formals);
+        lval_del(v->body);
+      }
+    break;
 
     // Free character buffers storing commands
     case LVAL_ERR: free(v->err); break;
@@ -255,6 +320,46 @@ lval* lval_join(lval* x, lval* y) {
   return x;
 }
 
+lval* lval_call(lenv* e, lval* f, lval* a) {
+  // If builtin then apply that
+  if (f->builtin) { return f->builtin(e, a); }
+
+  // Store argument counts
+  int given = a->count;
+  int total = f->formals->count;
+
+  // While arguments remain, process them into env
+  while (a->count) {
+    // Ran out of formals to bind, return error
+    if (f->formals->count == 0) {
+      lval_del(a); return lval_err("Function passed too many arguments, Got %i, Expected %i.", given, total);
+    }
+
+    // pop first symbol from formals
+    lval* sym = lval_pop(f->formals, 0);
+    // pop first from args
+    lval* val = lval_pop(a, 0);
+    // bind copy into function environment
+    lenv_put(f->env, sym, val);
+    // clean up
+    lval_del(sym); lval_del(val);
+  }
+
+  // argument list bound, clean up
+  lval_del(a);
+
+  // If all formals bound, evaluate
+  if (f->formals->count == 0) {
+    // set function enviornment parent to current eval enviornment
+    f->env->par = e;
+
+    return builtin_eval(f->env, lval_add(lval_sexpr(), lval_copy(f->body)));
+  } else {
+    // return partially evaluated function
+    return lval_copy(f);
+  }
+}
+
 //Evaluate an s-expression
 lval* lval_eval_sexpr(lenv* e, lval* v) {
 
@@ -283,7 +388,7 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
   }
 
   //Call builtin with operator
-  lval* result = f->fun(e, v);
+  lval* result = lval_call(e, f, v);
   lval_del(f);
   return result;
 }
@@ -320,7 +425,13 @@ void lval_print(lval* v) {
     case LVAL_SYM: printf("%s", v->sym); break;
     case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
     case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
-    case LVAL_FUN: printf("<function>"); break;
+    case LVAL_FUN: 
+      if (v->builtin) {
+        printf("<builtin>");
+      } else {
+        printf("(\\ "); lval_print(v->formals); putchar(' '); lval_print(v->body); putchar(')');
+      }
+    break;
   }
 }
 

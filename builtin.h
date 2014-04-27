@@ -16,8 +16,12 @@ lval* builtin_cons(lenv* e, lval* a);
 lval* builtin_len (lenv* e, lval* a);
 lval* builtin_init(lenv* e, lval* a);
 
-//Variable define
+//Language features
+lval* builtin_var(lenv* e, lval* a, char* func);
+lval* builtin_lambda(lenv* e, lval* a);
 lval* builtin_def(lenv* e, lval* a);
+lval* builtin_put(lenv* e, lval* a);
+
 
 //Math functions
 lval* builtin_add(lenv* e, lval* a);

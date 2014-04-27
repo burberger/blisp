@@ -19,13 +19,16 @@ typedef lval*(*lbuiltin)(lenv*, lval*);
 struct lval {
   ltype_t type;
 
-  //numeric values
-  union {
-    long num;
-    char* err;
-    char* sym;
-    lbuiltin fun;
-  };
+  // Basic values
+  long num;
+  char* err;
+  char* sym;
+
+  // Function
+  lbuiltin builtin;
+  lenv* env;
+  lval* formals;
+  lval* body;
 
   int count;
   struct lval** cell;
@@ -38,6 +41,7 @@ struct lvar {
 };
 
 struct lenv {
+  lenv* par;
   struct lvar* vars;
 };
 
@@ -46,6 +50,8 @@ lenv* lenv_new(void);
 void lenv_del(lenv* e);
 lval* lenv_get(lenv* e, lval* k);
 void lenv_put(lenv* e, lval* k, lval* v);
+void lenv_def(lenv* e, lval* k, lval* v);
+lenv* lenv_copy(lenv* e);
 
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func);
 void lenv_add_builtins(lenv* e);
@@ -57,6 +63,7 @@ lval* lval_sym(char* s);
 lval* lval_fun(lbuiltin func);
 lval* lval_sexpr(void);
 lval* lval_qexpr(void);
+lval* lval_lambda(lval* formals, lval* body);
 
 lval* lval_copy(lval* v);
 
@@ -72,6 +79,7 @@ lval* lval_read(mpc_ast_t* t);
 lval* lval_pop(lval* v, int i);
 lval* lval_take(lval* v, int i);
 lval* lval_join(lval* x, lval* y);
+lval* lval_call(lenv* e, lval* f, lval* a);
 
 lval* lval_eval_sexpr(lenv* e, lval* v);
 lval* lval_eval(lenv* e, lval* v);
