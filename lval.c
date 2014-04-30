@@ -106,7 +106,7 @@ void lenv_add_builtins(lenv* e) {
 
   //Variable functions
   lenv_add_builtin(e, "=",    builtin_put);  lenv_add_builtin(e, "def",  builtin_def);
-  lenv_add_builtin(e, "\\",   builtin_lambda);
+  lenv_add_builtin(e, "\\",   builtin_lambda); lenv_add_builtin(e, "penv", builtin_penv);
 
   //Math functions
   lenv_add_builtin(e, "+", builtin_add); lenv_add_builtin(e, "-", builtin_sub);
@@ -337,6 +337,20 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
 
     // pop first symbol from formals
     lval* sym = lval_pop(f->formals, 0);
+
+    if (strcmp(sym->sym, "&") == 0) {
+      //Ensure & is followed by another symbol
+      if (f->formals->count != 1) {
+        lval_del(a);
+        return lval_err("Function formal invalid. Symbol '&' not followed by single symbol.");
+      }
+
+      lval* nsym = lval_pop(f->formals, 0);
+      lenv_put(f->env, nsym, builtin_list(e, a));
+      lval_del(sym); lval_del(nsym);
+      break;
+    }
+
     // pop first from args
     lval* val = lval_pop(a, 0);
     // bind copy into function environment
@@ -347,6 +361,20 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
 
   // argument list bound, clean up
   lval_del(a);
+
+  if (f->formals->count > 0 && strcmp(f->formals->cell[0]->sym, "&") == 0) {
+    if (f->formals->count != 2) {
+      return lval_err("Function format invalid. Symbol '&' not followed by a single symbol");
+    }
+
+    lval_del(lval_pop(f->formals, 0));
+
+    lval* sym = lval_pop(f->formals, 0);
+    lval* val = lval_qexpr();
+
+    lenv_put(f->env, sym, val);
+    lval_del(sym); lval_del(val);
+  }
 
   // If all formals bound, evaluate
   if (f->formals->count == 0) {
@@ -379,7 +407,7 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
   //Single expression
   if (v->count == 1) { return lval_take(v, 0); }
 
-  //Ensure element is unction after evaluation
+  //Ensure element is function after evaluation
   lval* f = lval_pop(v, 0);
   if (f->type != LVAL_FUN) {
     lval_del(f);

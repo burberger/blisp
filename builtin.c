@@ -100,20 +100,22 @@ lval* builtin_init(lenv* e, lval* a) {
 }
 
 lval* builtin_var(lenv* e, lval* a, char* func) {
-  LASSERT_TYPE("def", a, 0, LVAL_QEXPR);
+  LASSERT_TYPE(func, a, 0, LVAL_QEXPR);
 
   lval* syms = a->cell[0];
   for (int i = 0; i < syms->count; i++) {
-    LASSERT(a, (syms->cell[i]->type == LVAL_SYM), "Function 'def' cannot define non-symbol, argument %i.", i);
+    LASSERT(a, (syms->cell[i]->type == LVAL_SYM),
+        "Function %s cannot define non-symbol, argument %i. Got %s, Expected %s.",
+        func, i, ltype_name(syms->cell[i]->type), ltype_name(LVAL_SYM));
   }
 
   LASSERT(a, (syms->count == a->count-1), 
-      "Function 'def' cannot define incorrect number of values. Got %i, Expected %i.",
-      syms->count, a->count-1);
+      "Function %s passed too many arguments for symbols. Got %i, Expected %i.",
+      func, syms->count, a->count-1);
 
   for (int i = 0; i < syms->count; i++) {
-    if (strcmp(func, "def")) { lenv_def(e, syms->cell[i], a->cell[i+1]); }
-    if (strcmp(func, "="))   { lenv_put(e, syms->cell[i], a->cell[i+1]); }
+    if (strcmp(func, "def") == 0) { lenv_def(e, syms->cell[i], a->cell[i+1]); }
+    if (strcmp(func, "=") == 0)   { lenv_put(e, syms->cell[i], a->cell[i+1]); }
   }
 
   lval_del(a);
@@ -141,6 +143,23 @@ lval* builtin_lambda(lenv* e, lval* a) {
   lval_del(a);
 
   return lval_lambda(formals, body);
+}
+
+//Enumerates and prints everything present in the provided enviornment
+lval* builtin_penv(lenv* e, lval* a) {
+  LASSERT_NUM("penv", a, 1);
+
+  struct lvar* env_var;
+  if (!e->par) {
+    printf("Environment has no parent.\nVariables:\n\n");
+  }
+  for (env_var = e->vars; env_var != NULL; env_var = env_var->hh.next) {
+    printf("Key: '%s'\n", env_var->sym);
+    lval_println(env_var->val);
+    putchar('\n');
+  }
+
+  return lval_sexpr();
 }
 
 lval* builtin_add(lenv* e, lval* a) { return builtin_op(e, a, "+"); }

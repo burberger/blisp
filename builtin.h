@@ -40,9 +40,10 @@ lval* builtin_init(lenv* e, lval* a);
 
 //Language features
 lval* builtin_var(lenv* e, lval* a, char* func);
-lval* builtin_lambda(lenv* e, lval* a);
 lval* builtin_def(lenv* e, lval* a);
 lval* builtin_put(lenv* e, lval* a);
+lval* builtin_lambda(lenv* e, lval* a);
+lval* builtin_penv(lenv* e, lval* a);
 
 
 //Math functions
