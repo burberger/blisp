@@ -84,6 +84,9 @@ lval* lval_call(lenv* e, lval* f, lval* a);
 lval* lval_eval_sexpr(lenv* e, lval* v);
 lval* lval_eval(lenv* e, lval* v);
 
+//Equality checking
+int lval_eq(lval* x, lval* y);
+
 //Pretty printing objects
 void lval_expr_print(lval* v, char first, char last);
 void lval_print(lval* v);

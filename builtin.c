@@ -145,21 +145,81 @@ lval* builtin_lambda(lenv* e, lval* a) {
   return lval_lambda(formals, body);
 }
 
-//Enumerates and prints everything present in the provided enviornment
-lval* builtin_penv(lenv* e, lval* a) {
-  LASSERT_NUM("penv", a, 1);
 
-  struct lvar* env_var;
-  if (!e->par) {
-    printf("Environment has no parent.\nVariables:\n\n");
-  }
-  for (env_var = e->vars; env_var != NULL; env_var = env_var->hh.next) {
-    printf("Key: '%s'\n", env_var->sym);
-    lval_println(env_var->val);
-    putchar('\n');
-  }
+lval* builtin_gt(lenv*e, lval* a) { return builtin_ord(e, a, ">"); }
+lval* builtin_lt(lenv*e, lval* a) { return builtin_ord(e, a, "<"); }
+lval* builtin_ge(lenv*e, lval* a) { return builtin_ord(e, a, ">="); }
+lval* builtin_le(lenv*e, lval* a) { return builtin_ord(e, a, "<="); }
 
-  return lval_sexpr();
+lval* builtin_ord(lenv* e, lval* a, char* op) {
+  LASSERT_NUM(op, a, 2);
+  LASSERT_TYPE(op, a, 0, LVAL_NUM);
+  LASSERT_TYPE(op, a, 1, LVAL_NUM);
+
+  int r;
+  if (strcmp(op, ">") == 0) { r = a->cell[0]->num > a->cell[1]->num; }
+  if (strcmp(op, "<") == 0) { r = a->cell[0]->num < a->cell[1]->num; }
+  if (strcmp(op, ">=") == 0) { r = a->cell[0]->num >= a->cell[1]->num; }
+  if (strcmp(op, "<=") == 0) { r = a->cell[0]->num <= a->cell[1]->num; }
+
+  lval_del(a);
+  return lval_num(r);
+}
+
+lval* builtin_eq(lenv* e, lval* a) { return builtin_cmp(e, a, "=="); }
+lval* builtin_ne(lenv* e, lval* a) { return builtin_cmp(e, a, "!="); }
+
+lval* builtin_cmp(lenv* e, lval* a, char* op) {
+  LASSERT_NUM(op, a, 2);
+  int r;
+  if (strcmp(op, "==") == 0) { r = lval_eq(a->cell[0], a->cell[1]); }
+  if (strcmp(op, "!=") == 0) { r = !lval_eq(a->cell[0], a->cell[1]); }
+  lval_del(a);
+  return lval_num(r);
+}
+
+lval* builtin_if(lenv* e, lval* a) {
+  LASSERT_NUM("if", a, 3);
+  LASSERT_TYPE("if", a, 0, LVAL_NUM);
+  LASSERT_TYPE("if", a, 1, LVAL_QEXPR);
+  LASSERT_TYPE("if", a, 2, LVAL_QEXPR);
+
+  //Make both expressions evaluatable
+  lval* x;
+  a->cell[1]->type = LVAL_SEXPR;
+  a->cell[2]->type = LVAL_SEXPR;
+
+  if (a->cell[0]->num) {
+    x = lval_eval(e, lval_pop(a, 1));
+  } else {
+    x = lval_eval(e, lval_pop(a, 2));
+  }
+  lval_del(a);
+  return x;
+}
+
+lval* builtin_and(lenv* e, lval* a) { return builtin_logic(e, a, "&&"); }
+lval* builtin_or(lenv* e, lval* a) { return builtin_logic(e, a, "||"); }
+
+lval* builtin_not(lenv* e, lval* a) {
+  LASSERT_NUM("!", a, 1);
+  LASSERT_TYPE("!", a, 0, LVAL_NUM);
+
+  int r = !a->cell[0]->num;
+  lval_del(a);
+  return lval_num(r);
+}
+
+lval* builtin_logic(lenv* e, lval* a, char* op) {
+  LASSERT_NUM(op, a, 2);
+  LASSERT_TYPE(op, a, 0, LVAL_NUM);
+  LASSERT_TYPE(op, a, 1, LVAL_NUM);
+  
+  int r;
+  if (strcmp(op, "&&") == 0) { r = a->cell[0]->num && a->cell[1]->num; }
+  if (strcmp(op, "||") == 0) { r = a->cell[0]->num || a->cell[1]->num; }
+  lval_del(a);
+  return lval_num(r);
 }
 
 lval* builtin_add(lenv* e, lval* a) { return builtin_op(e, a, "+"); }

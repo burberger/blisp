@@ -2,8 +2,8 @@
 
 #ifndef BUILTIN_H
 #define BUILTIN_H
-//
-//Macro for error checking in builtin functions
+
+//Macros for error checking
 #define LASSERT(args, cond, fmt, ...) \
   if (!(cond)) { \
     lval* err = lval_err(fmt, ##__VA_ARGS__); \
@@ -43,8 +43,24 @@ lval* builtin_var(lenv* e, lval* a, char* func);
 lval* builtin_def(lenv* e, lval* a);
 lval* builtin_put(lenv* e, lval* a);
 lval* builtin_lambda(lenv* e, lval* a);
-lval* builtin_penv(lenv* e, lval* a);
 
+//Control flow
+lval* builtin_gt(lenv*e, lval* a);
+lval* builtin_lt(lenv*e, lval* a);
+lval* builtin_ge(lenv*e, lval* a);
+lval* builtin_le(lenv*e, lval* a);
+lval* builtin_ord(lenv* e, lval* a, char* op);
+
+lval* builtin_eq(lenv* e, lval* a);
+lval* builtin_ne(lenv* e, lval* a);
+lval* builtin_cmp(lenv* e, lval* a, char* op);
+
+lval* builtin_and(lenv* e, lval* a);
+lval* builtin_or(lenv* e, lval* a);
+lval* builtin_not(lenv* e, lval* a);
+lval* builtin_logic(lenv* e, lval* a, char* op);
+
+lval* builtin_if(lenv* e, lval* a);
 
 //Math functions
 lval* builtin_add(lenv* e, lval* a);
