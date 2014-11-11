@@ -18,7 +18,7 @@ lenv* lenv_new(void) {
 //Deletes the provided environment
 void lenv_del(lenv* e) {
   struct lvar *current_var, *tmp;
-  
+
   //Iterate over hash table and clean up each node
   HASH_ITER(hh, e->vars, current_var, tmp) {
     HASH_DEL(e->vars, current_var);
@@ -27,6 +27,16 @@ void lenv_del(lenv* e) {
     free(current_var);
   }
   free(e);
+}
+
+void lenv_iter(lenv* e) {
+  struct lvar *current_var, *tmp;
+  //Iterate over hash table and print each node
+  HASH_ITER(hh, e->vars, current_var, tmp) {
+    printf("%s ", current_var->sym);
+    lval_print(current_var->val);
+    printf("\n");
+  }
 }
 
 //Search environment for value
@@ -106,7 +116,7 @@ void lenv_add_builtins(lenv* e) {
 
   //Variable functions
   lenv_add_builtin(e, "=",  builtin_put);  lenv_add_builtin(e, "def", builtin_def);
-  lenv_add_builtin(e, "\\", builtin_lambda); 
+  lenv_add_builtin(e, "\\", builtin_lambda); lenv_add_builtin(e, "env", builtin_env);
 
   //Control flow functions
   lenv_add_builtin(e, "if", builtin_if);
@@ -114,7 +124,7 @@ void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, ">",  builtin_gt); lenv_add_builtin(e, "<",  builtin_lt);
   lenv_add_builtin(e, ">=", builtin_ge); lenv_add_builtin(e, "<=", builtin_le);
 
-  //Locical operators
+  //Logical operators
   lenv_add_builtin(e, "&&", builtin_and); lenv_add_builtin(e, "||", builtin_or);
   lenv_add_builtin(e, "!",  builtin_not);
 
@@ -157,6 +167,14 @@ lval* lval_sym(char* s) {
   v->type = LVAL_SYM;
   v->sym = malloc(strlen(s) + 1);
   strcpy(v->sym, s);
+  return v;
+}
+
+lval* lval_str(char* s) {
+  lval* v = malloc(sizeof(lval));
+  v->type = LVAL_STR;
+  v->str = malloc(strlen(s)+1);
+  strcpy(v->str, s);
   return v;
 }
 
@@ -205,7 +223,7 @@ lval* lval_copy(lval* v) {
   switch (v->type) {
     //Copy numbers and functions directly
     case LVAL_NUM: x->num = v->num; break;
-    case LVAL_FUN: 
+    case LVAL_FUN:
       if (v->builtin) {
         x->builtin = v->builtin;
       } else {
@@ -218,6 +236,7 @@ lval* lval_copy(lval* v) {
 
     case LVAL_ERR: x->err = malloc(strlen(v->err)+1); strcpy(x->err, v->err); break;
     case LVAL_SYM: x->sym = malloc(strlen(v->sym)+1); strcpy(x->sym, v->sym); break;
+    case LVAL_STR: x->str = malloc(strlen(v->str)+1); strcpy(x->str, v->str); break;
 
     case LVAL_SEXPR:
     case LVAL_QEXPR:
@@ -237,7 +256,7 @@ void lval_del(lval* v) {
   switch (v->type) {
     // Do nothing special for numbers or functions
     case LVAL_NUM: break;
-    case LVAL_FUN: 
+    case LVAL_FUN:
       if (!v->builtin) {
         lenv_del(v->env);
         lval_del(v->formals);
@@ -248,6 +267,7 @@ void lval_del(lval* v) {
     // Free character buffers storing commands
     case LVAL_ERR: free(v->err); break;
     case LVAL_SYM: free(v->sym); break;
+    case LVAL_STR: free(v->str); break;
 
     case LVAL_QEXPR:
     case LVAL_SEXPR:
@@ -276,10 +296,26 @@ lval* lval_read_num(mpc_ast_t* t) {
   return errno != ERANGE ? lval_num(x) : lval_err("Invalid number");
 }
 
+lval* lval_read_str(mpc_ast_t* t) {
+  int len = strlen(t->contents);
+  //Remove closing quote
+  t->contents[len-1] = '\0';
+  //Length without quotes and with null character is len-1
+  char* unescaped = malloc(len-1);
+  //Skip first quote character
+  strcpy(unescaped, t->contents+1);
+  //Find escape characters, make string, clean up
+  unescaped = mpcf_unescape(unescaped);
+  lval* str = lval_str(unescaped);
+  free(unescaped);
+  return str;
+}
+
 //Parse an lval from the AST
 lval* lval_read(mpc_ast_t* t) {
   if (strstr(t->tag, "number")) { return lval_read_num(t); }
   if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
+  if (strstr(t->tag, "string")) { return lval_read_str(t); }
 
   // if root or sexpr make empty list
   lval* x = NULL;
@@ -294,6 +330,7 @@ lval* lval_read(mpc_ast_t* t) {
     if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
     if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
     if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
+    if (strstr(t->children[i]->tag,  "comment")) { continue; }
     x = lval_add(x, lval_read(t->children[i]));
   }
 
@@ -448,6 +485,7 @@ int lval_eq(lval* x, lval* y) {
     case LVAL_NUM: return x->num == y->num;
     case LVAL_ERR: return (strcmp(x->err, y->err) == 0);
     case LVAL_SYM: return (strcmp(x->sym, y->sym) == 0);
+    case LVAL_STR: return (strcmp(x->str, y->str) == 0);
     case LVAL_FUN:
       if (x->builtin || y->builtin) {
         return x->builtin == y->builtin;
@@ -480,15 +518,26 @@ void lval_expr_print(lval* v, char open, char close) {
   putchar(close);
 }
 
+void lval_print_str(lval* v) {
+  // Copy the string
+  char* escaped = malloc(strlen(v->str)+1);
+  strcpy(escaped, v->str);
+  // Escape, print between " chars, free copy
+  escaped = mpcf_escape(escaped);
+  printf("\"%s\"", escaped);
+  free(escaped);
+}
+
 // Print contents of lval
 void lval_print(lval* v) {
   switch(v->type) {
     case LVAL_NUM: printf("%li", v->num); break;
     case LVAL_ERR: printf("Error: %s", v->err); break;
     case LVAL_SYM: printf("%s", v->sym); break;
+    case LVAL_STR: lval_print_str(v); break;
     case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
     case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
-    case LVAL_FUN: 
+    case LVAL_FUN:
       if (v->builtin) {
         printf("<builtin>");
       } else {

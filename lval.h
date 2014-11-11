@@ -11,7 +11,7 @@ typedef struct lval lval;
 typedef struct lenv lenv;
 
 // Enumeration of value types and error types
-typedef enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR} ltype_t;
+typedef enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_STR, LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR} ltype_t;
 
 typedef lval*(*lbuiltin)(lenv*, lval*);
 
@@ -23,6 +23,7 @@ struct lval {
   long num;
   char* err;
   char* sym;
+  char* str;
 
   // Function
   lbuiltin builtin;
@@ -47,6 +48,7 @@ struct lenv {
 
 //Environment functions
 lenv* lenv_new(void);
+void lenv_iter(lenv* e);
 void lenv_del(lenv* e);
 lval* lenv_get(lenv* e, lval* k);
 void lenv_put(lenv* e, lval* k, lval* v);
@@ -60,6 +62,7 @@ void lenv_add_builtins(lenv* e);
 lval* lval_num(long x);
 lval* lval_err(char* fmt, ...);
 lval* lval_sym(char* s);
+lval* lval_str(char* s);
 lval* lval_fun(lbuiltin func);
 lval* lval_sexpr(void);
 lval* lval_qexpr(void);

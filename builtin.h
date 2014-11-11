@@ -38,10 +38,11 @@ lval* builtin_cons(lenv* e, lval* a);
 lval* builtin_len (lenv* e, lval* a);
 lval* builtin_init(lenv* e, lval* a);
 
-//Language features
+//Variable functions
 lval* builtin_var(lenv* e, lval* a, char* func);
 lval* builtin_def(lenv* e, lval* a);
 lval* builtin_put(lenv* e, lval* a);
+lval* builtin_env(lenv* e, lval* a);
 lval* builtin_lambda(lenv* e, lval* a);
 
 //Control flow
@@ -55,6 +56,7 @@ lval* builtin_eq(lenv* e, lval* a);
 lval* builtin_ne(lenv* e, lval* a);
 lval* builtin_cmp(lenv* e, lval* a, char* op);
 
+//Boolean logic
 lval* builtin_and(lenv* e, lval* a);
 lval* builtin_or(lenv* e, lval* a);
 lval* builtin_not(lenv* e, lval* a);

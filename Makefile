@@ -11,3 +11,6 @@ mpc: mpc.c mpc.h
 
 blisp: prompt.c mpc.o lval.o
 	$(CC) -Wall -g -std=c99 -o blisp prompt.c mpc.o lval.o builtin.o -lm -lreadline
+
+clean:
+	rm -f *.o blisp

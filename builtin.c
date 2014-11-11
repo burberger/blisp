@@ -6,6 +6,7 @@ char* ltype_name(ltype_t type) {
     case LVAL_NUM: return "Number";
     case LVAL_ERR: return "Error";
     case LVAL_SYM: return "Symbol";
+    case LVAL_STR: return "String";
     case LVAL_SEXPR: return "S-Expression";
     case LVAL_QEXPR: return "Q-Expression";
     default: return "Unknown";
@@ -109,7 +110,7 @@ lval* builtin_var(lenv* e, lval* a, char* func) {
         func, i, ltype_name(syms->cell[i]->type), ltype_name(LVAL_SYM));
   }
 
-  LASSERT(a, (syms->count == a->count-1), 
+  LASSERT(a, (syms->count == a->count-1),
       "Function %s passed too many arguments for symbols. Got %i, Expected %i.",
       func, syms->count, a->count-1);
 
@@ -124,6 +125,11 @@ lval* builtin_var(lenv* e, lval* a, char* func) {
 
 lval* builtin_def(lenv* e, lval* a) { return builtin_var(e, a, "def"); }
 lval* builtin_put(lenv* e, lval* a) { return builtin_var(e, a, "="); }
+
+lval* builtin_env(lenv* e, lval* a) {
+  lenv_iter(e);
+  return lval_sexpr();
+}
 
 lval* builtin_lambda(lenv* e, lval* a) {
   LASSERT_NUM("\\", a, 2);
@@ -214,7 +220,7 @@ lval* builtin_logic(lenv* e, lval* a, char* op) {
   LASSERT_NUM(op, a, 2);
   LASSERT_TYPE(op, a, 0, LVAL_NUM);
   LASSERT_TYPE(op, a, 1, LVAL_NUM);
-  
+
   int r;
   if (strcmp(op, "&&") == 0) { r = a->cell[0]->num && a->cell[1]->num; }
   if (strcmp(op, "||") == 0) { r = a->cell[0]->num || a->cell[1]->num; }
@@ -248,7 +254,7 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
   //While list has elems, pop and process operators
   while (a->count > 0) {
     lval* y = lval_pop(a, 0);
-    
+
     if (strcmp(op, "+") == 0) { x->num += y->num; }
     if (strcmp(op, "-") == 0) { x->num -= y->num; }
     if (strcmp(op, "*") == 0) { x->num *= y->num; }
@@ -259,7 +265,7 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
         lval_del(y);
         return lval_err("Divide by zero.");
       } else {
-        x->num /= y->num; 
+        x->num /= y->num;
       }
     }
     if (strcmp(op, "%") == 0) {
@@ -268,7 +274,7 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
         lval_del(y);
         return lval_err("Divide by zero.");
       } else {
-        x->num %= y->num; 
+        x->num %= y->num;
       }
     }
 
