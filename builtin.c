@@ -286,3 +286,70 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
   lval_del(a);
   return x;
 }
+
+lval* builtin_load(lenv* e, lval* a) {
+  LASSERT_NUM("load", a, 1);
+  LASSERT_TYPE("load", a, 0, LVAL_STR);
+
+  //Parse file given by string as filename
+  mpc_result_t r;
+  if (mpc_parse_contents(a->cell[0]->str, blisp, &r)) {
+    //Read Contents
+    lval* expr = lval_read(r.output);
+    mpc_ast_delete(r.output);
+
+    //Evaluate expressions on stack
+    while (expr->count) {
+      lval* x = lval_eval(e, lval_pop(expr, 0));
+      if (x->type == LVAL_ERR) {
+        lval_println(x);
+      }
+      lval_del(x);
+    }
+
+    //Delete expression and args
+    lval_del(expr);
+    lval_del(a);
+
+    //Return empty list
+    return lval_sexpr();
+
+  } else {
+    //Get error message as string and return as lval_err
+    char* err_msg = mpc_err_string(r.error);
+    mpc_err_delete(r.error);
+
+    lval* err = lval_err("Could not load Library %s", err_msg);
+    free(err_msg);
+    lval_del(a);
+
+    //Cleanup and return error
+    return err;
+  }
+}
+
+lval* builtin_print(lenv* e, lval* a) {
+  //Print each argument followed by a space
+  for (int i = 0; i < a->count; i++) {
+    lval_print(a->cell[i]); putchar(' ');
+  }
+
+  //Print a newline and delete args
+  putchar('\n');
+  lval_del(a);
+
+  return lval_sexpr();
+}
+
+lval* builtin_error(lenv* e, lval* a) {
+  LASSERT_NUM("error", a, 1);
+  LASSERT_TYPE("error", a, 0, LVAL_STR);
+
+  //Build error from first arg
+  lval* err = lval_err(a->cell[0]->str);
+
+  //clean up, return
+  lval_del(a);
+  return err;
+}
+

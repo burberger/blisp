@@ -15,17 +15,18 @@
 
 #include "mpc.h"
 #include "lval.h"
+#include "builtin.h"
 
 int main(int argc, char** argv) {
   // Create parser
-  mpc_parser_t* number  = mpc_new("number");
-  mpc_parser_t* symbol  = mpc_new("symbol");
-  mpc_parser_t* string  = mpc_new("string");
-  mpc_parser_t* comment = mpc_new("comment");
-  mpc_parser_t* sexpr   = mpc_new("sexpr");
-  mpc_parser_t* qexpr   = mpc_new("qexpr");
-  mpc_parser_t* expr    = mpc_new("expr");
-  mpc_parser_t* blisp   = mpc_new("blisp");
+  number  = mpc_new("number");
+  symbol  = mpc_new("symbol");
+  string  = mpc_new("string");
+  comment = mpc_new("comment");
+  sexpr   = mpc_new("sexpr");
+  qexpr   = mpc_new("qexpr");
+  expr    = mpc_new("expr");
+  blisp   = mpc_new("blisp");
 
   mpca_lang(MPC_LANG_DEFAULT,
     "                                                  \
@@ -42,36 +43,52 @@ int main(int argc, char** argv) {
     number, symbol, string, comment, sexpr, qexpr, expr, blisp
   );
 
-  // Print version info
-  puts("BLisp v0.0.1");
-  puts("Press Ctrl+C to Exit");
-
   // Build environment before running
   lenv* env = lenv_new();
   lenv_add_builtins(env);
 
-  while (1) {
-    char* input = readline("Blisp> ");
+  //Run interpreter
+  if (argc == 1) {
+    // Print version info
+    puts("BLisp v0.0.1");
+    puts("Press Ctrl+C to Exit");
 
-    //Skip input if blank
-    if (strcmp(input, "") == 0) continue;
+    while (1) {
+      char* input = readline("Blisp> ");
 
-    add_history(input);
+      //Skip input if blank
+      if (strcmp(input, "") == 0) continue;
 
-    //Parse input
-    mpc_result_t r;
-    if (mpc_parse("<stdin>", input, blisp, &r)) {
-      lval* x = lval_eval(env, lval_read(r.output));
-      lval_println(x);
-      lval_del(x);
-      mpc_ast_delete(r.output);
-    } else {
-      //Failed, print parser error
-      mpc_err_print(r.error);
-      mpc_err_delete(r.error);
+      add_history(input);
+
+      //Parse input
+      mpc_result_t r;
+      if (mpc_parse("<stdin>", input, blisp, &r)) {
+        lval* x = lval_eval(env, lval_read(r.output));
+        lval_println(x);
+        lval_del(x);
+        mpc_ast_delete(r.output);
+      } else {
+        //Failed, print parser error
+        mpc_err_print(r.error);
+        mpc_err_delete(r.error);
+      }
+
+      free(input);
     }
+  }
 
-    free(input);
+  //Process files on argument list
+  if (argc >= 2) {
+    //Loop over args, process contents, print any returned errors
+    for (int i = 1; i < argc; i++) {
+      lval* args = lval_add(lval_sexpr(), lval_str(argv[i]));
+      lval* x = builtin_load(env, args);
+      if (x->type == LVAL_ERR) {
+        lval_println(x);
+      }
+      lval_del(x);
+    }
   }
 
   //Cleanup parser before exiting

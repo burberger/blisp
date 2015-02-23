@@ -10,6 +10,16 @@ struct lenv;
 typedef struct lval lval;
 typedef struct lenv lenv;
 
+// Parser forward declarations
+mpc_parser_t* number;
+mpc_parser_t* symbol;
+mpc_parser_t* string;
+mpc_parser_t* comment;
+mpc_parser_t* sexpr;
+mpc_parser_t* qexpr;
+mpc_parser_t* expr;
+mpc_parser_t* blisp;
+
 // Enumeration of value types and error types
 typedef enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_STR, LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR} ltype_t;
 

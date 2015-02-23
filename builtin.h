@@ -74,5 +74,9 @@ lval* builtin_mod(lenv* e, lval* a);
 
 lval* builtin_op(lenv* e, lval* a, char* op);
 
+//String functions
+lval* builtin_load(lenv* e, lval* a);
+lval* builtin_print(lenv* e, lval* a);
+lval* builtin_error(lenv* e, lval* a);
 
 #endif
